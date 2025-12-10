@@ -1,0 +1,40 @@
+# ------------------------
+# Python / Virtual Env
+# ------------------------
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# ------------------------
+# OS / Editor Files
+# ------------------------
+.DS_Store
+.idea/
+.vscode/
+
+# ------------------------
+# Data Files (large raw datasets)
+# ------------------------
+data/FLAT_CMPL.txt
+data/FLAT_RCL.txt
+data/Safercar_data.csv
+
+# ------------------------
+# Exports (optional)
+- exports/*.csv
+
+# ------------------------
+# Tableau artifacts
+# ------------------------
+*.hyper
+*.tds
+*.tdsx
+*.twb
+*.twbx
+
+# ------------------------
+# Logs / Temp
+# ------------------------
+*.log
+*.tmp
