@@ -1,9 +1,31 @@
--- Database Schema
-DROP TABLE IF EXISTS flat_cmpl;
-DROP TABLE IF EXISTS flat_rcl;
+-- ==============================
+-- NHTSA Defect Analysis Schema
+-- ==============================
 
--- Complaints Table
-CREATE TABLE flat_cmpl (
+-- 0. Safety: drop analytical artifacts only
+DROP VIEW IF EXISTS vehicle_risk_summary CASCADE;
+DROP TABLE IF EXISTS vehicle_risk_scores CASCADE;
+DROP TABLE IF EXISTS component_analysis CASCADE;
+DROP TABLE IF EXISTS complaint_trends CASCADE;
+
+
+
+-- 1. ETL state table (for automated pipelines)
+CREATE TABLE IF NOT EXISTS etl_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT now()
+);
+
+INSERT INTO etl_state (key, value, updated_at)
+VALUES
+    ('last_recall_fetch', '2024-01-01', now()),
+    ('last_complaint_check', '2024-Q4', now()),
+    ('total_recalls_loaded', '0', now())
+ON CONFLICT (key) DO NOTHING;
+
+-- 2. Raw complaints table (if not exists)
+CREATE TABLE IF NOT EXISTS flat_cmpl (
     CMPLID TEXT,
     ODINO TEXT,
     MFR_NAME TEXT,
@@ -55,10 +77,10 @@ CREATE TABLE flat_cmpl (
     VEHICLES_TOWED_YN TEXT
 );
 
--- Recalls Table
-CREATE TABLE flat_rcl (
+-- 3. Raw recalls table (if not exists)
+CREATE TABLE IF NOT EXISTS flat_rcl (
     RECORD_ID NUMERIC,
-    CAMPNO TEXT,
+    CAMPNO TEXT PRIMARY KEY,
     MAKETXT TEXT,
     MODELTXT TEXT,
     YEARTXT TEXT,
@@ -88,7 +110,7 @@ CREATE TABLE flat_rcl (
     PARK_OUTSIDE TEXT
 );
 
--- Create Vehicle Risk Summary (Mega-view query)
+-- 4. Vehicle risk summary view (no data yet if flat_* are empty)
 CREATE VIEW vehicle_risk_summary AS
 SELECT
     c.MAKETXT,
@@ -101,12 +123,12 @@ LEFT JOIN flat_rcl r
     ON c.MAKETXT = r.MAKETXT
     AND c.MODELTXT = r.MODELTXT
     AND c.YEARTXT = r.YEARTXT
-WHERE c.YEARTXT BETWEEN '2010' AND '2025' -- NOTE: different range than other queries
-  AND c.MAKETXT NOT IN ('UNKNOWN', 'FIRESTONE', 'GOODYEAR', 'MICHELIN') -- Exclude tires
-  AND c.MODELTXT NOT LIKE '%CHILD SEAT%' -- Exclude car seats
+WHERE c.YEARTXT BETWEEN '2010' AND '2025'
+  AND c.MAKETXT NOT IN ('UNKNOWN', 'FIRESTONE', 'GOODYEAR', 'MICHELIN')
+  AND c.MODELTXT NOT LIKE '%CHILD SEAT%'
 GROUP BY c.MAKETXT, c.MODELTXT, c.YEARTXT;
 
--- Vehicle Risk Score Table
+-- 5. Vehicle risk scores (materialized snapshot)
 CREATE TABLE vehicle_risk_scores AS
 SELECT
     MAKETXT,
@@ -125,8 +147,7 @@ FROM vehicle_risk_summary
 WHERE total_complaints > 50
 ORDER BY total_complaints DESC;
 
-
--- Component Pareto Table
+-- 6. Component Pareto snapshot
 CREATE TABLE component_analysis AS
 SELECT
     COMPDESC,
@@ -142,8 +163,7 @@ GROUP BY COMPDESC
 ORDER BY total_complaints DESC
 LIMIT 50;
 
-
--- Time-Series Trend
+-- 7. Complaint trends snapshot
 CREATE TABLE complaint_trends AS
 SELECT
     MAKETXT,
@@ -154,7 +174,12 @@ SELECT
     COUNT(*) AS complaint_count
 FROM flat_cmpl
 WHERE YEARTXT BETWEEN '2015' AND '2024'
-  AND LDATE ~ '^\d{8}$'  -- Valid date format: YYYYMMDD
+  AND LDATE ~ '^\d{8}$'
   AND MAKETXT IN ('FORD', 'CHEVROLET', 'SUBARU', 'HONDA', 'TOYOTA')
 GROUP BY MAKETXT, MODELTXT, YEARTXT, complaint_year, complaint_quarter
 ORDER BY complaint_year DESC, complaint_quarter DESC;
+
+-- Add seen campaign numbers tracking
+INSERT INTO etl_state (key, value, updated_at)
+VALUES ('seen_campaign_numbers', '[]', now())
+ON CONFLICT (key) DO NOTHING;

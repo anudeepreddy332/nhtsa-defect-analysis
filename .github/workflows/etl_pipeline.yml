@@ -1,0 +1,38 @@
+name: NHTSA ETL Pipeline
+
+on:
+  schedule:
+    # Runs every Monday at 9:00 AM IST (3:30 AM UTC)
+    - cron: '30 3 * * 1'
+
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  run-etl:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run ETL Pipeline
+      env:
+        SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      run: |
+        python -m etl.run_etl
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "❌ ETL Pipeline failed!"
+        exit 1

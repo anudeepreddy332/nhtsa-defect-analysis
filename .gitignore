@@ -5,6 +5,7 @@
 venv/
 __pycache__/
 *.pyc
+.env
 
 # ------------------------
 # OS / Editor Files
@@ -12,6 +13,7 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+*.swp
 
 # ------------------------
 # Data Files (large raw datasets)
@@ -23,7 +25,7 @@ data/Safercar_data.csv
 # ------------------------
 # Exports (optional)
 - exports/*.csv
-
+exports/*.png
 # ------------------------
 # Tableau artifacts
 # ------------------------
@@ -38,3 +40,4 @@ data/Safercar_data.csv
 # ------------------------
 *.log
 *.tmp
+CASESTUDY.md
