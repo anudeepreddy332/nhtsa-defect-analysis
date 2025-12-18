@@ -14,9 +14,9 @@ load_dotenv(dotenv_path=env_path)
 # Page config
 st.set_page_config(
     page_title="NHTSA Silent Recall Detector",
-    page_icon="🚙",
+    page_icon="🚗",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # Database connection
@@ -45,7 +45,7 @@ def get_connection_factory():
 conn_factory = get_connection_factory()
 
 # Sidebar
-st.sidebar.title("🚙 NHTSA Dashboard")
+st.sidebar.title("🚗 NHTSA Dashboard")
 st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
