@@ -269,25 +269,68 @@ elif page == "📈 Trends":
                     fires,
                     injuries,
                     deaths
-                FROM complaint_trends
+                FROM yearly_trends
                 ORDER BY year
                 """,
                 conn
             )
 
             # Multi-line chart
-            fig = px.line(
-                trends,
-                x="year",
-                y=["total_complaints", "crashes", "fires"],
-                labels={"value": "Count", "variable": "Category"},
-                title="Yearly Complaint Trends (2015-2024)"
-            )
-
+        fig = px.line(
+            trends,
+            x="year",
+            y=["total_complaints", "crashes", "fires"],
+            labels={"value": "Count", "variable": "Category"},
+            title="Yearly Complaint Trends (2015-2024)"
+        )
+        fig.update_layout(height=500, hovermode='x unified')
         st.plotly_chart(fig, use_container_width=True)
 
-    except Exception:
-        st.warning("Trend data not available yet.")
+        # Show data table
+        st.dataframe(
+            trends.style.background_gradient(subset=['total_complaints'], cmap='Reds'),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Recall volume by manufacturer
+        st.markdown("---")
+        st.subheader("📦 Recall Volume by Manufacturer")
+
+        with conn_factory() as conn:
+            recalls_by_make = pd.read_sql(
+                """
+                SELECT 
+                    MAKETXT AS make,
+                    COUNT(*) AS recall_count,
+                    SUM(POTAFF) AS total_vehicles_affected
+                FROM flat_rcl
+                GROUP BY MAKETXT
+                ORDER BY recall_count DESC
+                LIMIT 15
+                """,
+                conn
+            )
+
+        fig2 = px.bar(
+            recalls_by_make,
+            x="make",
+            y="recall_count",
+            hover_data=["total_vehicles_affected"],
+            labels={"recall_count": "Number of Recalls", "make": "Manufacturer"},
+            title="Top 15 Manufacturers by Recall Count",
+            color="recall_count",
+            color_continuous_scale="Reds"
+        )
+
+        fig2.update_layout(height=500)
+        st.plotly_chart(fig2, use_container_width=True)
+
+        st.dataframe(recalls_by_make, use_container_width=True, hide_index=True)
+
+    except Exception as e:
+        st.error(f"Could not load trend  {e}")
+        st.info("The yearly_trends table may not exist. Run the ETL pipeline to generate it.")
 
 # ==== Footer ====
 st.markdown("---")
