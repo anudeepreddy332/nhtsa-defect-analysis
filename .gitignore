@@ -41,3 +41,4 @@ exports/*.png
 *.log
 *.tmp
 CASESTUDY.md
+.streamlit/secrets.toml
