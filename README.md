@@ -1,13 +1,15 @@
 # NHTSA Automotive Defect Analysis: Silent Recall Detection
 ![status](https://img.shields.io/badge/NHTSA-Defect_Analysis-blue)
 ![sql](https://img.shields.io/badge/Stack-SQL-green)
-![tableau](https://img.shields.io/badge/Visualization-Tableau-orange)
+![tableau](https://img.shields.io/badge/Visualization-Tableau-orange)\
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://nhtsa-silent-recall.streamlit.app)
+[![ETL Pipeline](https://github.com/anudeepreddy332/nhtsa-defect-analysis/actions/workflows/etl_pipeline.yml/badge.svg)](https://github.com/anudeepreddy332/nhtsa-defect-analysis/actions/workflows/etl_pipeline.yml)
 
+## [**Live Interactive Dashboard**](https://nhtsa-silent-recall.streamlit.app) ⚡
 **Author:** Anudeep  
 **Tools:** PostgreSQL, Python, Tableau Public  
 **Data Source:** [NHTSA Office of Defects Investigation](https://www.nhtsa.gov/nhtsa-datasets-and-apis)
 
-[![ETL Pipeline](https://github.com/anudeepreddy332/nhtsa-defect-analysis/actions/workflows/etl_pipeline.yml/badge.svg)](https://github.com/anudeepreddy332/nhtsa-defect-analysis/actions/workflows/etl_pipeline.yml)
 
 ## 📊 Overview
 
@@ -17,12 +19,27 @@ Automated ETL pipeline tracking vehicle safety complaints and recalls from NHTSA
 
 ---
 
+## 🏗️ Architecture
+
+graph LR
+A[NHTSA Recalls API] -->|Weekly Fetch| B[Python ETL]\
+B -->|Incremental Load| C[PostgreSQL (Supabase)]\
+C -->|Live Queries| D[Streamlit Dashboard]\
+E[GitHub Actions] -->|Cron: Mon 9AM IST| B\
+D -->|Public URL| F[Users]
+
+---
+
 ## 🎯 Project Highlights
 
-- **Dynamic Tracking:** Auto-targets top 20 vehicles by complaint volume
-- **202 Recalls Tracked:** Across 20 high-risk vehicles (2020-2024)
-- **Incremental ETL:** Deduplicates by campaign number, runs weekly
-- **Risk Scoring:** Complaint-to-recall ratios identify silent recalls
+- **Automated Recall Intelligence:** Weekly ETL pipeline fetches vehicle recalls from the NHTSA API and tracks **10,000+ consumer safety complaints**.
+- **Dynamic Risk Monitoring:** Automatically targets the **top 20 vehicles by complaint volume** (2020–2024), tracking **202 recalls** across high-risk models.
+- **Silent Recall Detection:** Uses **complaint-to-recall ratios** to surface vehicles with disproportionately high complaints but low official recalls.
+- **Incremental, Reliable ETL:** Runs weekly, deduplicates records by campaign number, and ensures consistent historical tracking.
+- **Interactive Risk Dashboard:** Live, query-driven analysis for exploring recall trends and vehicle safety risks.
+
+**Use Cases:** Consumer safety advocacy · Automotive journalism · Insurance risk assessment
+
 
 ---
 
@@ -40,10 +57,11 @@ Automated ETL pipeline tracking vehicle safety complaints and recalls from NHTSA
 
 ## 🛠️ Tech Stack
 
-- **Python 3.11** - ETL orchestration
-- **PostgreSQL (Supabase)** - Cloud data warehouse
-- **GitHub Actions** - Weekly automation
-- **NHTSA API** - Recall data source
+- **ETL:** Python (psycopg2, requests, state management)
+- **Database:** PostgreSQL (Supabase cloud, connection pooling)
+- **Orchestration:** GitHub Actions (scheduled workflows)
+- **Visualization:** Streamlit + Plotly (interactive charts)
+- **Deployment:** Streamlit Cloud (free tier)
 
 ---
 
@@ -135,7 +153,7 @@ cd nhtsa-defect-analysis
 - [x] Automated weekly ETL pipeline
 - [x] Dynamic vehicle tracking (top 20)
 - [x] Risk scoring algorithm
-- [ ] Streamlit dashboard deployment
+- [x] Streamlit dashboard deployment
 - [ ] Email alerts for critical risk scores
 - [ ] Expand to complaint data fetching
 - [ ] Historical trend analysis (5+ years)
