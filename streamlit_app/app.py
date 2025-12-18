@@ -281,7 +281,7 @@ elif page == "📈 Trends":
             x="year",
             y=["total_complaints", "crashes", "fires"],
             labels={"value": "Count", "variable": "Category"},
-            title="Yearly Complaint Trends (2015-2024)"
+            title="Yearly Complaint Trends (2020-2024)"
         )
         fig.update_layout(height=500, hovermode='x unified')
         st.plotly_chart(fig, use_container_width=True)
