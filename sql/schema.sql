@@ -183,3 +183,12 @@ ORDER BY complaint_year DESC, complaint_quarter DESC;
 INSERT INTO etl_state (key, value, updated_at)
 VALUES ('seen_campaign_numbers', '[]', now())
 ON CONFLICT (key) DO NOTHING;
+
+
+-- Alert State Table
+CREATE TABLE IF NOT EXISTS alert_state (
+        alert_name TEXT PRIMARY KEY,
+        last_payload_hash TEXT,
+        updated_at TIMESTAMP DEFAULT now()
+);
+
