@@ -4,6 +4,7 @@
 ![tableau](https://img.shields.io/badge/Visualization-Tableau-orange)\
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://nhtsa-silent-recall.streamlit.app)
 [![ETL Pipeline](https://github.com/anudeepreddy332/nhtsa-defect-analysis/actions/workflows/etl_pipeline.yml/badge.svg)](https://github.com/anudeepreddy332/nhtsa-defect-analysis/actions/workflows/etl_pipeline.yml)
+> **This is a live safety monitoring system, not a static analysis project.**
 
 ## [**Live Interactive Dashboard**](https://nhtsa-silent-recall.streamlit.app) ⚡
 **Author:** Anudeep  
@@ -13,7 +14,7 @@
 
 ## 📊 Overview
 
-Automated ETL pipeline tracking vehicle safety complaints and recalls from NHTSA. Identifies "silent recalls" - vehicles with high complaint volumes but disproportionately low recall actions.
+Automated, stateful ETL pipeline that continuously ingests NHTSA complaints and recalls, detects silent safety risks, and sends real-time alerts.
 
 **Key Insight:** Jeep Wrangler 2024 has **93 complaints per recall** (837 complaints, 9 recalls) - potential safety concern.
 
@@ -22,11 +23,23 @@ Automated ETL pipeline tracking vehicle safety complaints and recalls from NHTSA
 ## 🏗️ Architecture
 
 graph LR
-A[NHTSA Recalls API] -->|Weekly Fetch| B[Python ETL]\
-B -->|Incremental Load| C[PostgreSQL (Supabase)]\
-C -->|Live Queries| D[Streamlit Dashboard]\
-E[GitHub Actions] -->|Cron: Mon 9AM IST| B\
+A[NHTSA Complaints API] -->|Incremental Fetch| B[Python ETL]
+
+A2[NHTSA Complaints FTP] -->|Quarterly Full Sync| B
+
+A3[NHTSA Recalls API] -->|Weekly Fetch| B
+
+B -->|Idempotent Load| C[PostgreSQL (Supabase)]
+
+C -->|Analytical Views| D[Streamlit Dashboard]
+
+C -->|Risk Threshold Breach| G[Email Alerts]
+
+E[GitHub Actions] -->|Cron + Manual Dispatch| B
+
 D -->|Public URL| F[Users]
+
+G -->|Critical Risk Notification| F
 
 ---
 
@@ -42,7 +55,29 @@ D -->|Public URL| F[Users]
 
 
 ---
+## 🔔 Automated Critical Risk Alerts
 
+This system actively monitors extreme complaint-to-recall imbalances and sends email alerts when meaningful changes are detected.
+* Alerts trigger only when the risk profile changes (hash-based change detection)
+* Prevents alert fatigue — no duplicate emails for unchanged data
+* Designed for consumer safety monitoring, not just visualization
+
+**Alert Definition:** 
+A vehicle is flagged as critical when consumer complaints vastly outpace official recalls, suggesting potential underreported or delayed safety action.
+
+**Example Alert Interpretation**
+```
+HONDA ACCORD 2020 → 171.5 complaints per recall
+(343 complaints, 2 recalls)
+```
+This means:
+* Hundreds of consumer safety complaints
+* Very few official recall actions
+* Possible “silent recall” risk
+
+📬 Alerts are generated automatically after each ETL run.
+
+---
 ## 📈 Top Risk Vehicles (Current Data)
 
 | Make | Model | Year | Complaints | Recalls | Risk Ratio |
@@ -62,6 +97,18 @@ D -->|Public URL| F[Users]
 - **Orchestration:** GitHub Actions (scheduled workflows)
 - **Visualization:** Streamlit + Plotly (interactive charts)
 - **Deployment:** Streamlit Cloud (free tier)
+
+---
+
+## ⚙️ Automation & Reliability Features
+* Stateful ingestion using etl_state and complaint ODI tracking
+* Idempotent inserts (safe re-runs, no duplicates)
+* API + FTP ingestion paths (fallback support)
+* Database-level analytics refresh
+* GitHub Actions scheduling + manual dispatch
+* Email alert deduplication using payload hashing
+
+This ensures the system behaves like a production monitoring pipeline, not a batch script.
 
 ---
 
@@ -91,29 +138,53 @@ nhtsa-defect-analysis/
 ## 🔄 ETL Pipeline Flow
 
 ```
-1. Fetch Top 20 Vehicles (by complaints)
+1. Identify High-Risk Vehicles (complaint-based)
    ↓
-2. Query NHTSA Recalls API
+2. Fetch New Complaints (NHTSA Complaints API)
    ↓
-3. Filter New Recalls (dedupe by campaign number)
+3. Deduplicate via ODI Tracking
    ↓
-4. Insert to PostgreSQL (idempotent)
+4. Fetch New Recalls (NHTSA Recalls API)
    ↓
-5. Refresh Analytical Tables
+5. Insert Data (Idempotent)
    ↓
-6. Dashboard Auto-Updates
+6. Refresh Analytical Tables
+   ↓
+7. Evaluate Risk Thresholds
+   ↓
+8. Send Alerts (if state changed)
+   ↓
+9. Dashboard Auto-Updates
 ```
 
 **Schedule:** Every Monday 9:00 AM IST
+
+---
+## 🧠 Why Complaint-to-Recall Ratio Matters
+
+Raw complaint counts alone can be misleading. This project introduces a normalized risk signal:
+```
+Risk Ratio = Total Complaints ÷ Total Recalls
+```
+Why this matters:
+* 	High complaints + high recalls = issues acknowledged
+* 	High complaints + low recalls = potential regulatory lag
+* 	Normalizes across vehicle popularity and sales volume
+
+This ratio is the core signal behind:
+* Risk rankings
+* Alerts
+* Dashboard prioritization
 
 ---
 
 ## 📊 Database Schema
 
 ### Core Tables
-- **`flat_cmpl`** - Complaint data (10,000 rows, 2020-2024)
+- **`flat_cmpl`** - Complaint data (API + FTP, incremental, deduplicated by ODI number)
 - **`flat_rcl`** - Recall data (202 rows, dynamic)
 - **`etl_state`** - Pipeline state tracking
+- **`alert_state`** – Tracks alert payload hashes to prevent duplicate notifications
 
 ### Analytical Views
 - **`vehicle_risk_summary`** - Joined complaints + recalls
@@ -148,23 +219,11 @@ cd nhtsa-defect-analysis
 
 ---
 
-## 📅 Roadmap
-
-- [x] Automated weekly ETL pipeline
-- [x] Dynamic vehicle tracking (top 20)
-- [x] Risk scoring algorithm
-- [x] Streamlit dashboard deployment
-- [ ] Email alerts for critical risk scores
-- [ ] Expand to complaint data fetching
-- [ ] Historical trend analysis (5+ years)
-
----
 
 ## Future Enhancements
 
 - **NLP on Complaint Text:** Use SpaCy/NLTK to extract keywords from `CDESCR` (e.g., "fire," "stall," "brake failure")
 - **Predictive Modeling:** Train ML classifier to predict recall likelihood based on complaint patterns
-- **Real-Time API:** Automate data refresh using NHTSA's API (currently manual download)
 - **Supplier Analysis:** Map components to suppliers to identify vendor quality issues
 
 ---
