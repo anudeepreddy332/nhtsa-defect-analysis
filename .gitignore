@@ -1,44 +1,37 @@
-# ------------------------
-# Python / Virtual Env
-# ------------------------
+# Python
 .venv/
 venv/
 __pycache__/
 *.pyc
 .env
 
-# ------------------------
-# OS / Editor Files
-# ------------------------
+# OS / IDE
 .DS_Store
 .idea/
 .vscode/
-*.swp
 
-# ------------------------
-# Data Files (large raw datasets)
-# ------------------------
-data/FLAT_CMPL.txt
-data/FLAT_RCL.txt
-data/Safercar_data.csv
+# Data (raw & large)
+data/*.txt
+data/*.csv
 
-# ------------------------
-# Exports (optional)
-- exports/*.csv
+# Exports
 exports/*.png
-# ------------------------
-# Tableau artifacts
-# ------------------------
-*.hyper
-*.tds
-*.tdsx
+exports/*.csv
+
+# Tableau
 *.twb
 *.twbx
+*.tds
+*.tdsx
+*.hyper
 
-# ------------------------
-# Logs / Temp
-# ------------------------
+# Logs / temp
 *.log
 *.tmp
-CASESTUDY.md
+
+# Secrets
 .streamlit/secrets.toml
+
+# Docs not meant for repo
+CASESTUDY.md
+RESUME_BULLETS.md

@@ -1,0 +1,26 @@
+name: Weekly Complaints API Ingestion
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'   # Sunday 3 AM UTC
+  workflow_dispatch:
+
+jobs:
+  load-complaints-api:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch complaints via NHTSA API
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python -m etl.fetch_complaints_api

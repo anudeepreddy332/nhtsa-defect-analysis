@@ -192,3 +192,6 @@ CREATE TABLE IF NOT EXISTS alert_state (
         updated_at TIMESTAMP DEFAULT now()
 );
 
+-- Ensure complaint ID uniqueness (required for ON CONFLICT)
+ALTER TABLE flat_cmpl
+ADD CONSTRAINT flat_cmpl_cmplid_unique UNIQUE (CMPLID);

@@ -1,13 +1,13 @@
-import psycopg2
-from datetime import datetime
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 DB_URL = os.getenv("SUPABASE_DB_URL")
 if not DB_URL:
-    raise RuntimeError("SUPABASE_DB_URL not set in .env")
+    raise RuntimeError("SUPABASE_DB_URL not loaded")
 
+import psycopg2
 
 class StateManager:
     """Database-backed ETL state (replaces state.json)"""

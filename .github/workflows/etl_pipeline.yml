@@ -36,3 +36,12 @@ jobs:
       run: |
         echo "❌ ETL Pipeline failed!"
         exit 1
+
+    - name: Run critical vehicle alert
+      env:
+        SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        ALERT_PASSWORD: ${{ secrets.ALERT_PASSWORD }}
+        ALERT_RECIPIENT: ${{ secrets.ALERT_RECIPIENT }}
+      run: |
+        python etl/critical_vehicle_alert.py

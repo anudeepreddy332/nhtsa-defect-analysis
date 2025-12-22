@@ -1,115 +1,97 @@
+from dotenv import load_dotenv
+from pathlib import Path
+import os
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+DB_URL = os.getenv("SUPABASE_DB_URL")
+if not DB_URL:
+    raise RuntimeError("SUPABASE_DB_URL is NOT loaded")
+
 import requests
 import psycopg2
 from datetime import datetime as dt
 from etl.state_manager import StateManager
 import json
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-DB_URL = os.getenv('SUPABASE_DB_URL')
+from time import sleep
 
 RECALL_API = "https://api.nhtsa.gov/recalls/recallsByVehicle"
+REQUEST_TIMEOUT = 20
+MAX_RETRIES = 3
+
+def safe_get(url, params):
+    """HTTP GET with retries"""
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            r = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+            if r.status_code == 200:
+                return r.json()
+            else:
+                print(f"[WARN] Status {r.status_code}, retry {attempt}")
+        except Exception as e:
+            print(f"[WARN] Request failed ({attempt}): {e}")
+        sleep(2)
+    return None
 
 
 def get_top_complaint_vehicles(limit=20):
     """Get vehicles with highest complaints from database"""
-    conn = psycopg2.connect(DB_URL)
-    cursor = conn.cursor()
+    with psycopg2.connect(DB_URL) as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT
+                    MAKETXT AS make,
+                    MODELTXT AS model,
+                    YEARTXT AS year,
+                    COUNT(*) AS complaint_count
+                FROM flat_cmpl
+                WHERE YEARTXT BETWEEN '2015' AND '2024'
+                  AND MAKETXT NOT IN ('UNKNOWN', 'FIRESTONE', 'GOODYEAR')
+                  AND MODELTXT != 'UNKNOWN'
+                GROUP BY MAKETXT, MODELTXT, YEARTXT
+                HAVING COUNT(*) > 50
+                ORDER BY complaint_count DESC
+                LIMIT %s
+            """, (limit,))
+            rows = cursor.fetchall()
 
-    cursor.execute("""
-        SELECT DISTINCT
-            MAKETXT AS make,
-            MODELTXT AS model,
-            YEARTXT AS year,
-            COUNT(*) AS complaint_count
-        FROM flat_cmpl
-        WHERE YEARTXT BETWEEN '2015' AND '2024'
-          AND MAKETXT NOT IN ('UNKNOWN', 'FIRESTONE', 'GOODYEAR')
-          AND MODELTXT != 'UNKNOWN'
-        GROUP BY MAKETXT, MODELTXT, YEARTXT
-        HAVING COUNT(*) > 50
-        ORDER BY complaint_count DESC
-        LIMIT %s
-    """, (limit,))
-
-    results = cursor.fetchall()
-    cursor.close()
-    conn.close()
-
-    vehicles = [
+    return [
         {"make": row[0], "model": row[1], "year": row[2], "complaint_count": row[3]}
-        for row in results
+        for row in rows
     ]
 
-    print(f"[INFO] Tracking top {len(vehicles)} vehicles by complaint volume")
-    for i, v in enumerate(vehicles[:5], 1):
-        print(f"  {i}. {v['make']} {v['model']} {v['year']} ({v['complaint_count']} complaints)")
-    if len(vehicles) > 5:
-        print(f"  ... and {len(vehicles) - 5} more")
 
-    return vehicles
-
-
-def fetch_recalls_for_vehicle(make, model, year):
-    """Fetch all recalls for a specific vehicle"""
-    params = {
-        "make": make,
-        "model": model,
-        "modelYear": year
-    }
-    try:
-        response = requests.get(RECALL_API, params=params, timeout=30)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("results", [])
-        else:
-            print(f"[WARN] API returned {response.status_code} for {make} {model} {year}")
-            return []
-    except Exception as e:
-        print(f"[ERROR] Failed to fetch {make} {model} {year}: {e}")
-        return []
+def fetch_recalls_for_vehicle(vehicle):
+    data = safe_get(RECALL_API, {
+        "make": vehicle["make"],
+        "model": vehicle["model"],
+        "modelYear": vehicle["year"]
+    })
+    return data.get("results", []) if data else []
 
 
 def fetch_new_recalls():
-    """Fetch recalls for tracked vehicles, deduplicate by campaign number"""
     sm = StateManager()
+    seen = set(json.loads(sm.get("seen_campaign_numbers") or "[]"))
 
-    # Get seen campaign numbers from state (stored as JSON string)
-    seen_raw = sm.get('seen_campaign_numbers')
-    seen = set(json.loads(seen_raw)) if seen_raw and seen_raw != '[]' else set()
-
-    # DYNAMIC: Get top 20 vehicles from complaint data
-    vehicles = get_top_complaint_vehicles(limit=20)
-
+    vehicles = get_top_complaint_vehicles()
     new_recalls = []
-    print(f"\n[INFO] Checking {len(vehicles)} vehicles for new recalls...")
-    print(f"[INFO] Already seen {len(seen)} campaign numbers\n")
 
     for v in vehicles:
-        recalls = fetch_recalls_for_vehicle(v['make'], v['model'], v['year'])
-
-        for recall in recalls:
-            campaign = recall.get('NHTSACampaignNumber')
-            if not campaign:
-                continue
-
-            if campaign not in seen:
-                new_recalls.append(recall)
+        recalls = fetch_recalls_for_vehicle(v)
+        for r in recalls:
+            campaign = r.get("NHTSACampaignNumber")
+            if campaign and campaign not in seen:
+                new_recalls.append(r)
                 seen.add(campaign)
-                print(f"[NEW] {campaign}: {v['make']} {v['model']} {v['year']}")
+                print(f"[NEW] {campaign} ({v['make']} {v['model']} {v['year']})")
 
-    # Update state
     if new_recalls:
-        sm.set('seen_campaign_numbers', json.dumps(list(seen)))
-        sm.set('last_recall_fetch', dt.now().strftime('%Y-%m-%d'))
-
-        total = int(sm.get('total_recalls_loaded') or 0)
-        sm.set('total_recalls_loaded', total + len(new_recalls))
+        sm.set("seen_campaign_numbers", json.dumps(list(seen)))
+        sm.set("last_recall_fetch", dt.utcnow().isoformat())
+        sm.set("total_recalls_loaded",
+               int(sm.get("total_recalls_loaded") or 0) + len(new_recalls))
 
     sm.close()
-
-    print(f"\n[INFO] Found {len(new_recalls)} new recalls")
     return new_recalls
 
 

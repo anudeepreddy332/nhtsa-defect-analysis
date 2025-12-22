@@ -1,9 +1,13 @@
-import psycopg2
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 DB_URL = os.getenv("SUPABASE_DB_URL")
+if not DB_URL:
+    raise RuntimeError("SUPABASE_DB_URL is NOT loaded")
+
+import psycopg2
 
 def insert_recalls(recalls):
     """Insert recalls with ON CONFLICT DO NOTHING (idempotent)"""
