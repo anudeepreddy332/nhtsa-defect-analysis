@@ -129,6 +129,8 @@ WHERE c.YEARTXT BETWEEN '2010' AND '2025'
 GROUP BY c.MAKETXT, c.MODELTXT, c.YEARTXT;
 
 -- 5. Vehicle risk scores (materialized snapshot)
+DROP TABLE IF EXISTS vehicle_risk_scores CASCADE;
+
 CREATE TABLE vehicle_risk_scores AS
 SELECT
     MAKETXT,
@@ -136,15 +138,43 @@ SELECT
     YEARTXT,
     total_complaints,
     total_recalls,
-    (total_complaints::FLOAT / NULLIF(total_recalls, 0)) AS risk_ratio,
+
+    -- Risk ratio only when recalls exist
     CASE
-        WHEN total_recalls = 0 AND total_complaints > 500 THEN 'CRITICAL'
-        WHEN total_recalls = 0 AND total_complaints > 200 THEN 'HIGH'
-        WHEN total_complaints > total_recalls * 10 THEN 'MEDIUM'
+        WHEN total_recalls > 0
+        THEN ROUND(total_complaints::NUMERIC / total_recalls, 1)
+        ELSE NULL
+    END AS risk_ratio,
+
+    -- Canonical risk classification
+    CASE
+        WHEN total_recalls = 0 AND total_complaints >= 300 THEN 'CRITICAL'
+        WHEN total_recalls = 0 AND total_complaints >= 100 THEN 'HIGH'
+        WHEN total_recalls > 0 AND total_complaints::FLOAT / total_recalls >= 100 THEN 'HIGH'
+        WHEN total_recalls > 0 AND total_complaints::FLOAT / total_recalls >= 50 THEN 'MEDIUM'
         ELSE 'LOW'
-    END AS risk_category
+    END AS risk_category,
+
+    -- Explicit flag for silent recalls
+    CASE
+        WHEN total_recalls = 0 THEN TRUE
+        ELSE FALSE
+    END AS zero_recall_flag
+
 FROM vehicle_risk_summary
 WHERE total_complaints > 50
+ORDER BY total_complaints DESC;
+
+-- Zero recall - high risk vehicles
+CREATE OR REPLACE VIEW zero_recall_high_risk AS
+SELECT
+    MAKETXT,
+    MODELTXT,
+    YEARTXT,
+    total_complaints,
+    risk_category
+FROM vehicle_risk_scores
+WHERE zero_recall_flag = TRUE
 ORDER BY total_complaints DESC;
 
 -- 6. Component Pareto snapshot
@@ -193,5 +223,14 @@ CREATE TABLE IF NOT EXISTS alert_state (
 );
 
 -- Ensure complaint ID uniqueness (required for ON CONFLICT)
-ALTER TABLE flat_cmpl
-ADD CONSTRAINT flat_cmpl_cmplid_unique UNIQUE (CMPLID);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'flat_cmpl_cmplid_unique'
+    ) THEN
+        ALTER TABLE flat_cmpl
+        ADD CONSTRAINT flat_cmpl_cmplid_unique UNIQUE (CMPLID);
+    END IF;
+END $$;

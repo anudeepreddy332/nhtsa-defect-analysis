@@ -19,7 +19,7 @@ def main():
 
     # Step 3: Load recalls
     print(f"\n[STEP 3] Loading {len(recalls)} recalls into database...")
-    inserted = insert_recalls(recalls)
+    insert_recalls(recalls)
 
     # Step 4: Refresh analytics
     print("\n[STEP 4] Refreshing analytical tables...")
