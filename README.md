@@ -16,8 +16,9 @@
 
 Automated, stateful ETL pipeline that continuously ingests NHTSA complaints and recalls, detects silent safety risks, and sends real-time alerts.
 
-**Key Insight:** Jeep Wrangler 2024 has **93 complaints per recall** (837 complaints, 9 recalls) - potential safety concern.
-
+**Key Insights:**  
+* GMC Sierra 1500 (2021) has **445 consumer complaints with ZERO recalls**, indicating a high-priority silent safety risk.  
+* Toyota Tundra (2024) follows with **245 complaints and zero recalls**.
 ---
 
 ## 🏗️ Architecture
@@ -67,8 +68,10 @@ A vehicle is flagged as critical when consumer complaints vastly outpace officia
 
 **Example Alert Interpretation**
 ```
-HONDA ACCORD 2020 → 171.5 complaints per recall
+HONDA ACCORD 2020 → 171.5 complaints per recall  
 (343 complaints, 2 recalls)
+
+Note: While recalls exist, the complaint-to-recall ratio remains extremely high, qualifying it as a **Medium-to-High Silent Recall Risk**.
 ```
 This means:
 * Hundreds of consumer safety complaints
@@ -78,15 +81,22 @@ This means:
 📬 Alerts are generated automatically after each ETL run.
 
 ---
-## 📈 Top Risk Vehicles (Current Data)
+## 🔴 Zero-Recall High-Risk Vehicles (Highest Priority)
 
-| Make | Model | Year | Complaints | Recalls | Risk Ratio |
-|------|-------|------|------------|---------|------------|
-| JEEP | WRANGLER | 2024 | 837 | 9 | **93.0** |
-| NISSAN | ROGUE | 2023 | 136 | 5 | **27.2** |
-| JEEP | WRANGLER 4XE | 2024 | 61 | 3 | **20.3** |
-| JEEP | GRAND CHEROKEE | 2022 | 68 | 4 | 17.0 |
-| HYUNDAI | PALISADE | 2024 | 65 | 4 | 16.3 |
+| Make | Model | Year | Complaints | Recalls |
+|-----|------|------|-----------|---------|
+| GMC | SIERRA 1500 | 2021 | 445 | 0 |
+| TOYOTA | TUNDRA | 2024 | 245 | 0 |
+
+## 🟠 Top Silent Recall Candidates (Complaints per Recall)
+
+| Rank | Make | Model | Year | Complaints | Recalls | Risk Ratio | Risk |
+|-----:|------|-------|------|------------|---------|------------|------|
+| 1 | HONDA | ACCORD | 2020 | 343 | 2 | 171.5 | MEDIUM |
+| 2 | HYUNDAI | PALISADE | 2020 | 487 | 3 | 162.3 | MEDIUM |
+| 3 | JEEP | WRANGLER | 2021 | 867 | 7 | 123.9 | MEDIUM |
+| 4 | NISSAN | ROGUE | 2023 | 606 | 5 | 121.2 | MEDIUM |
+| 5 | KIA | TELLURIDE | 2020 | 698 | 6 | 116.3 | MEDIUM |
 
 ---
 
@@ -177,6 +187,37 @@ This ratio is the core signal behind:
 * Dashboard prioritization
 
 ---
+## 🧩 Top Component Failure Drivers
+
+The majority of safety complaints are concentrated in a small number of critical vehicle systems:
+
+| Rank | Component | Complaints | Crashes | Fires | Injuries |
+|-----:|-----------|------------|---------|-------|----------|
+| 1 | ENGINE | 2,519 | 22 | 48 | 18 |
+| 2 | ELECTRICAL SYSTEM | 2,209 | 41 | 45 | 33 |
+| 3 | POWER TRAIN | 1,926 | 36 | 4 | 20 |
+| 4 | UNKNOWN / OTHER | 1,877 | 54 | 32 | 72 |
+| 5 | SERVICE BRAKES | 814 | 70 | 6 | 34 |
+
+This distribution validates a Pareto-style risk concentration, with drivetrain and electrical systems dominating safety complaints.
+
+---
+
+## 📈 Complaint Trends Over Time
+### Recent Complaint Trends (2020–2024)
+
+| Year | Complaints | Crashes | Fires | Injuries | Deaths |
+|------|------------|---------|-------|----------|--------|
+| 2020 | 6,819 | 167 | 53 | 197 | 6 |
+| 2021 | 4,233 | 103 | 74 | 91 | 0 |
+| 2022 | 2,254 | 106 | 38 | 58 | 2 |
+| 2023 | 2,992 | 143 | 36 | 99 | 1 |
+| 2024 | 3,397 | 207 | 41 | 124 | 14 |
+
+**Observation:**  
+Although total complaints dipped post-2020, **crash-related and fatal incidents rebounded sharply in 2024**, reinforcing the need for continuous monitoring rather than raw volume analysis alone.
+
+---
 
 ## 📊 Database Schema
 
@@ -190,7 +231,7 @@ This ratio is the core signal behind:
 - **`vehicle_risk_summary`** - Joined complaints + recalls
 - **`vehicle_risk_scores`** - Risk categorization (CRITICAL/HIGH/MEDIUM/LOW)
 - **`component_analysis`** - Component failure Pareto (top 50)
-- **`yearly_trends`** - Time series (2015-2024)
+- **`yearly_trends`** - Time series (2020-2024)
 - **`top_recalled_vehicles`** - Vehicles with 2+ recalls
 
 ---
