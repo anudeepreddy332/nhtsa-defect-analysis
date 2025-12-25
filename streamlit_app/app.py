@@ -318,8 +318,7 @@ elif page == "🧠 Systemic Risk":
     st.title("🧠 Systemic Safety Risk Analysis")
     st.markdown(
         """
-        This section highlights **long-term and structural safety risks**  
-        that are **not visible through short-term recall activity alone**.
+        This section highlights **long-term and structural safety risks** that are **not visible through short-term recall activity alone**.
         """
     )
 
