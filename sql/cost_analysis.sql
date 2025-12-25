@@ -10,7 +10,7 @@ WITH component_costs AS (
      + SUM(INJURED) * 100000
     )::bigint AS estimated_cost
   FROM flat_cmpl
-  WHERE YEARTXT BETWEEN '2015' AND '2024'
+  WHERE YEARTXT BETWEEN '2020' AND '2024'
     AND MAKETXT NOT IN ('UNKNOWN','FIRESTONE')
   GROUP BY COMPDESC
 ),

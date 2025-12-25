@@ -133,6 +133,79 @@ def refresh_analytical_tables():
         LIMIT 100;
     """)
 
+    # 5. Repeat Offender Vehicles (persistent top-complaint models)
+    print("[INFO] Refreshing repeat_offenders...")
+    cursor.execute("DROP TABLE IF EXISTS repeat_offenders;")
+    cursor.execute("""
+        CREATE TABLE repeat_offenders AS
+        WITH yearly_aggregates AS (
+            SELECT
+                MAKETXT,
+                MODELTXT,
+                YEARTXT,
+                COUNT(*) AS complaints
+            FROM flat_cmpl
+            WHERE YEARTXT BETWEEN '2020' AND '2024'
+            GROUP BY MAKETXT, MODELTXT, YEARTXT
+        ),
+        yearly_rankings AS (
+            SELECT
+                MAKETXT,
+                MODELTXT,
+                YEARTXT,
+                complaints,
+                ROW_NUMBER() OVER (
+                    PARTITION BY YEARTXT
+                    ORDER BY complaints DESC
+                ) AS rank_in_year
+            FROM yearly_aggregates
+        )
+        SELECT
+            MAKETXT,
+            MODELTXT,
+            COUNT(DISTINCT YEARTXT) AS years_in_top10,
+            SUM(complaints) AS total_complaints,
+            STRING_AGG(YEARTXT, ',' ORDER BY YEARTXT) AS problem_years
+        FROM yearly_rankings
+        WHERE rank_in_year <= 10
+        GROUP BY MAKETXT, MODELTXT
+        HAVING COUNT(DISTINCT YEARTXT) >= 3
+        ORDER BY years_in_top10 DESC, total_complaints DESC;
+    """)
+
+    # 6. Component Cost Impact (economic + injury burden)
+    print("[INFO] Refreshing component_cost_impact")
+    cursor.execute("DROP TABLE IF EXISTS component_cost_impact;")
+    cursor.execute("""
+        CREATE TABLE component_cost_impact AS
+        WITH component_costs AS (
+            SELECT
+                COMPDESC,
+                COUNT(*) AS total_complaints,
+                SUM(CASE WHEN CRASH = 'Y' THEN 1 ELSE 0 END) AS crash_count,
+                SUM(INJURED) AS total_injuries,
+                (
+                    COUNT(*) * 5000
+                    + SUM(CASE WHEN CRASH = 'Y' THEN 1 ELSE 0 END) * 50000
+                    + SUM(INJURED) * 100000
+                )::BIGINT AS estimated_cost
+            FROM flat_cmpl
+            WHERE YEARTXT BETWEEN '2020' AND '2024'
+                AND MAKETXT NOT IN ('UNKNOWN', 'FIRESTONE', 'GOODYEAR')
+            GROUP BY COMPDESC
+        )
+        SELECT
+            COMPDESC,
+            total_complaints,
+            crash_count,
+            total_injuries,
+            estimated_cost,
+            (estimated_cost * 0.10)::BIGINT AS savings_if_reduced_10pct
+        FROM component_costs
+        ORDER BY estimated_cost DESC
+        LIMIT 50;
+    """)
+
     conn.commit()
 
     # Get counts
@@ -144,12 +217,23 @@ def refresh_analytical_tables():
     trend_count = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(*) FROM top_recalled_vehicles;")
     recall_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM repeat_offenders;")
+    repeat_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM component_cost_impact;")
+    cost_count = cursor.fetchone()[0]
+
+    print(
+        f"[SUCCESS] Refreshed: "
+        f"{risk_count} risk scores, "
+        f"{comp_count} components, "
+        f"{trend_count} years, "
+        f"{recall_count} recalled vehicles, "
+        f"{repeat_count} repeat offenders, "
+        f"{cost_count} cost-impact components"
+    )
 
     cursor.close()
     conn.close()
-
-    print(
-        f"[SUCCESS] Refreshed: {risk_count} risk scores, {comp_count} components, {trend_count} years, {recall_count} recalled vehicles")
 
 
 if __name__ == "__main__":

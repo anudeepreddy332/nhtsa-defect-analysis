@@ -37,7 +37,13 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigate",
-    ["🏠 Overview", "🚨 Silent Recalls", "📊 Components", "📈 Trends"]
+    [
+        "🏠 Overview",
+        "🚨 Silent Recalls",
+        "🧠 Systemic Risk",
+        "📊 Components",
+        "📈 Trends"
+    ]
 )
 
 st.sidebar.markdown("---")
@@ -128,6 +134,49 @@ def load_zero_recall():
     df = df.reset_index(drop=True)
     df.index = df.index + 1
     return df
+
+@st.cache_data(ttl=600)
+def load_repeat_offenders():
+    with conn_factory() as conn:
+        df = pd.read_sql(
+            """
+            SELECT
+                MAKETXT AS make,
+                MODELTXT AS model,
+                years_in_top10,
+                total_complaints,
+                problem_years
+            FROM repeat_offenders
+            ORDER BY years_in_top10 DESC, total_complaints DESC
+            """,
+            conn
+        )
+    df = df.reset_index(drop=True)
+    df.index = df.index + 1
+    return df
+
+
+@st.cache_data(ttl=600)
+def load_component_cost_impact():
+    with conn_factory() as conn:
+        df = pd.read_sql(
+            """
+            SELECT
+                COMPDESC AS component,
+                total_complaints,
+                crash_count,
+                total_injuries,
+                estimated_cost,
+                savings_if_reduced_10pct
+            FROM component_cost_impact
+            ORDER BY estimated_cost DESC
+            """,
+            conn
+        )
+    df = df.reset_index(drop=True)
+    df.index = df.index + 1
+    return df
+
 
 # ======================
 # Pages
@@ -263,6 +312,82 @@ elif page == "🚨 Silent Recalls":
         "(contrast with zero-recall high-risk vehicles above)."
     )
     st.dataframe(trv, use_container_width=True)
+
+
+elif page == "🧠 Systemic Risk":
+    st.title("🧠 Systemic Safety Risk Analysis")
+    st.markdown(
+        """
+        This section highlights **long-term and structural safety risks**  
+        that are **not visible through short-term recall activity alone**.
+        """
+    )
+
+    # =====================
+    # Repeat Offenders
+    # =====================
+    st.markdown("---")
+    st.subheader("🔁 Repeat Offender Vehicles")
+    st.caption(
+        "Vehicles that ranked in the **top 10 complaint volume** for at least **3 different years** (2020–2024)."
+    )
+
+    repeat_df = load_repeat_offenders()
+
+    if repeat_df.empty:
+        st.info("No repeat offenders detected for this period.")
+    else:
+        st.warning(
+            "These vehicles show **persistent safety issues across multiple years**, "
+            "indicating systemic defects rather than isolated incidents."
+        )
+        st.dataframe(repeat_df, use_container_width=True)
+
+    # =====================
+    # Component Cost Impact
+    # =====================
+    st.markdown("---")
+    st.subheader("💰 Component-Level Cost & Injury Impact")
+    st.caption(
+        "Estimated economic and injury burden based on complaint volume, crashes, and injuries."
+    )
+
+    cost_df = load_component_cost_impact()
+
+    if cost_df.empty:
+        st.info("No component cost data available.")
+    else:
+        fig = px.bar(
+            cost_df.head(15),
+            x="component",
+            y="estimated_cost",
+            hover_data=[
+                "total_complaints",
+                "crash_count",
+                "total_injuries",
+                "savings_if_reduced_10pct"
+            ],
+            title="Top Components by Estimated Safety Cost (2020–2024)",
+            labels={"estimated_cost": "Estimated Cost ($)"}
+        )
+
+        fig.update_layout(
+            xaxis_title="Component",
+            yaxis_title="Estimated Cost ($)",
+            height=500
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+        st.dataframe(cost_df, use_container_width=True)
+
+    st.markdown(
+        """
+        **Why this matters:**  
+        These insights help prioritize **preventive engineering fixes** and
+        **regulatory action** where they would reduce the most harm.
+        """
+    )
+
 
 
 elif page == "📊 Components":

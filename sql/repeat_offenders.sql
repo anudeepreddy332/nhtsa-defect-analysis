@@ -6,7 +6,7 @@ WITH yearly_aggregates AS (
     YEARTXT,
     COUNT(*) AS complaints
   FROM flat_cmpl
-  WHERE YEARTXT BETWEEN '2015' AND '2024'
+  WHERE YEARTXT BETWEEN '2020' AND '2024'
   GROUP BY MAKETXT, MODELTXT, YEARTXT
 ),
 yearly_rankings AS (

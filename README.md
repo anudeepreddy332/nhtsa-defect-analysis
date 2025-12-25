@@ -81,6 +81,28 @@ This means:
 📬 Alerts are generated automatically after each ETL run.
 
 ---
+
+## 🧠 Strategic Safety Intelligence (Beyond Real-Time Alerts)
+
+In addition to real-time risk monitoring, this system includes
+**long-term and economic safety analytics** designed for policy,
+regulatory, and investigative use.
+
+### Persistent Risk Detection
+- Identifies vehicles that repeatedly rank among the **top complaint volumes across multiple years**
+- Surfaces models with chronic safety issues rather than one-off spikes
+- Enables pattern-based intervention instead of reactive recalls
+
+### Economic & Injury Impact Modeling
+- Estimates financial and human cost of unresolved component failures
+- Quantifies **preventable harm** using complaint, crash, and injury data
+- Highlights where a **10% defect reduction** would yield the greatest benefit
+
+These analytical modules transform raw complaint data into
+**actionable safety intelligence**, supporting long-term decision-making
+beyond weekly monitoring.
+
+---
 ## 🔴 Zero-Recall High-Risk Vehicles (Highest Priority)
 
 | Make | Model | Year | Complaints | Recalls |
@@ -228,11 +250,15 @@ Although total complaints dipped post-2020, **crash-related and fatal incidents 
 - **`alert_state`** – Tracks alert payload hashes to prevent duplicate notifications
 
 ### Analytical Views
+
 - **`vehicle_risk_summary`** - Joined complaints + recalls
 - **`vehicle_risk_scores`** - Risk categorization (CRITICAL/HIGH/MEDIUM/LOW)
 - **`component_analysis`** - Component failure Pareto (top 50)
 - **`yearly_trends`** - Time series (2020-2024)
 - **`top_recalled_vehicles`** - Vehicles with 2+ recalls (surfaced in Silent Recalls dashboard for regulatory contrast)
+- **`repeat_offenders`** – Vehicles appearing in top complaints across ≥3 years
+- **`component_cost_impact`** – Estimated economic & injury cost by component
+
 ---
 
 ## 🚀 Setup Instructions
