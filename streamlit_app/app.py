@@ -236,6 +236,35 @@ elif page == "🚨 Silent Recalls":
     else:
         st.warning("Select at least one manufacturer")
 
+    st.markdown("---")
+    st.subheader("📦 Vehicles With Multiple Recalls (Manufacturer Acknowledged Issues)")
+
+    with conn_factory() as conn:
+        trv = pd.read_sql(
+            """
+            SELECT
+                MAKETXT AS make,
+                MODELTXT AS model,
+                YEARTXT AS year,
+                recall_count,
+                total_units_affected
+            FROM top_recalled_vehicles
+            ORDER BY recall_count DESC
+            LIMIT 20
+            """,
+            conn
+        )
+
+    trv = trv.reset_index(drop=True)
+    trv.index = trv.index + 1
+
+    st.caption(
+        "These vehicles have multiple official recalls, indicating acknowledged safety action "
+        "(contrast with zero-recall high-risk vehicles above)."
+    )
+    st.dataframe(trv, use_container_width=True)
+
+
 elif page == "📊 Components":
     st.title("📊 Component Failure Analysis")
 

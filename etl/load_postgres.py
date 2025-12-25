@@ -71,7 +71,8 @@ def refresh_analytical_tables():
                 ELSE 'LOW'
             END AS risk_category
         FROM vehicle_risk_summary
-        WHERE total_complaints > 50
+        WHERE YEARTXT BETWEEN '2020' AND '2024'
+          AND total_complaints > 50
         ORDER BY total_complaints DESC;
     """)
 
@@ -88,14 +89,14 @@ def refresh_analytical_tables():
             SUM(INJURED) AS total_injuries,
             SUM(DEATHS) AS total_deaths
         FROM flat_cmpl
-        WHERE YEARTXT BETWEEN '2015' AND '2024'
+        WHERE YEARTXT BETWEEN '2020' AND '2024'
           AND MAKETXT NOT IN ('UNKNOWN', 'FIRESTONE', 'GOODYEAR')
         GROUP BY COMPDESC
         ORDER BY total_complaints DESC
         LIMIT 50;
     """)
 
-    # 3. Time Series by Year (NEW!)
+    # 3. Time Series by Year
     print("[INFO] Refreshing yearly_trends...")
     cursor.execute("DROP TABLE IF EXISTS yearly_trends;")
     cursor.execute("""
@@ -108,12 +109,12 @@ def refresh_analytical_tables():
             SUM(INJURED) AS injuries,
             SUM(DEATHS) AS deaths
         FROM flat_cmpl
-        WHERE YEARTXT BETWEEN '2015' AND '2024'
+        WHERE YEARTXT BETWEEN '2020' AND '2024'
         GROUP BY YEARTXT
         ORDER BY YEARTXT;
     """)
 
-    # 4. Top Recalled Vehicles (NEW!)
+    # 4. Top Recalled Vehicles
     print("[INFO] Refreshing top_recalled_vehicles...")
     cursor.execute("DROP TABLE IF EXISTS top_recalled_vehicles;")
     cursor.execute("""
@@ -125,6 +126,7 @@ def refresh_analytical_tables():
             COUNT(*) AS recall_count,
             SUM(POTAFF) AS total_units_affected
         FROM flat_rcl
+        WHERE YEARTXT BETWEEN '2020' AND '2024'
         GROUP BY MAKETXT, MODELTXT, YEARTXT
         HAVING COUNT(*) > 1
         ORDER BY recall_count DESC

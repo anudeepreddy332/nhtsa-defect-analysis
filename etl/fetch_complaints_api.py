@@ -17,7 +17,7 @@ from etl.state_manager import StateManager
 COMPLAINT_API = "https://api.nhtsa.gov/complaints/complaintsByVehicle"
 TIMEOUT = 20
 MAX_VEHICLES = 50          # safety cap
-REQUEST_DELAY = 0.05       # polite but fast
+REQUEST_DELAY = 0.05
 
 # =========================
 # API FETCH
@@ -54,7 +54,6 @@ def load_complaints():
 
     with psycopg2.connect(DB_URL) as conn:
         with conn.cursor() as cur:
-            # 🔑 Choose vehicles intelligently (NOT flat_cmpl)
             cur.execute("""
                 SELECT MAKETXT, MODELTXT, YEARTXT
                 FROM vehicle_risk_scores
@@ -102,7 +101,7 @@ def load_complaints():
 
         print(f"[INFO] Inserting {len(rows_to_insert)} new complaints")
 
-        # 🚀 BULK INSERT (FAST & SAFE)
+        # 🚀 BULK INSERT
         with conn.cursor() as cur:
             cur.executemany("""
                 INSERT INTO flat_cmpl (

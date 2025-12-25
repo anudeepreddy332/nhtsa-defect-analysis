@@ -15,28 +15,45 @@ import psycopg2
 from datetime import datetime as dt
 
 ALERT_NAME = "critical_vehicle_risk"
-print("DB_URL =", DB_URL)
-def get_critical_vehicles():
-    """Get vehicles with risk_ratio > 50"""
+
+def get_zero_recall_vehicles():
     with psycopg2.connect(DB_URL) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 SELECT
                     MAKETXT, MODELTXT, YEARTXT,
-                    total_complaints, total_recalls,
-                    ROUND((total_complaints::FLOAT / NULLIF(total_recalls,0))::NUMERIC, 1) AS risk_ratio
+                    total_complaints
                 FROM vehicle_risk_scores
-                WHERE (total_complaints::FLOAT / NULLIF(total_recalls,0)) > 50
-                ORDER BY risk_ratio DESC
-                """
-            )
+                WHERE total_recalls = 0
+                  AND risk_category IN ('HIGH','CRITICAL')
+                ORDER BY total_complaints DESC
+                LIMIT 5
+            """)
+            return cur.fetchall()
+
+
+def get_ratio_critical_vehicles():
+    with psycopg2.connect(DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    MAKETXT, MODELTXT, YEARTXT,
+                    ROUND((total_complaints::FLOAT / total_recalls)::NUMERIC, 1)
+                FROM vehicle_risk_scores
+                WHERE total_recalls > 0
+                  AND (total_complaints::FLOAT / total_recalls) >= 100
+                ORDER BY 4 DESC
+                LIMIT 10
+            """)
             return cur.fetchall()
 
 def hash_payload(rows):
-    """Create a stable hash of alert payload"""
+    """
+    rows: list of tuples in the form
+    (make, model, year, value, category)
+    """
     normalized = "|".join(
-        f"{r[0]}-{r[1]}-{r[2]}-{r[5]}"
+        f"{r[0]}-{r[1]}-{r[2]}-{r[3]}-{r[4]}"
         for r in rows
     )
     return hashlib.sha256(normalized.encode()).hexdigest()
@@ -67,32 +84,30 @@ def update_hash(new_hash):
             """, (ALERT_NAME, new_hash))
         conn.commit()
 
-def send_email(vehicles):
+def send_email(zero_recall, ratio_risk):
     sender = os.getenv("ALERT_EMAIL")
     password = os.getenv("ALERT_PASSWORD")
-    recipient = os.getenv("ALERT_RECIPIENT")
+    recipients = os.getenv("ALERT_RECIPIENTS")
 
-    if not all([sender, password, recipient]):
+    if not all([sender, password, recipients]):
         print("[WARN] Email credentials not set")
         return
 
-    body = (
-        "🚨 NHTSA CRITICAL VEHICLE RISK ALERT\n\n"
-        "This alert flags vehicles with an unusually HIGH number of consumer complaints\n"
-        "relative to the number of official recalls.\n\n"
-        "📌 How to read this:\n"
-        "• A ratio of 100:1 means ~100 complaints for every 1 recall\n"
-        "• Higher ratios may indicate delayed recalls or unresolved safety issues\n\n"
-        "⚠️ Vehicles currently exceeding the risk threshold:\n\n"
-    )
+    recipients = [r.strip() for r in recipients.split(",")]
 
-    for v in vehicles:
-        make, model, year, complaints, recalls, ratio = v
-        body += (
-            f"• {make} {model} {year}\n"
-            f"  ↳ ~{ratio} complaints per recall\n"
-            f"  ↳ {complaints} complaints vs {recalls} recalls\n\n"
-        )
+    body = "🚨 NHTSA VEHICLE SAFETY RISK ALERT\n\n"
+
+    if zero_recall:
+        body += "🔴 ZERO-RECALL HIGH-RISK VEHICLES (IMMEDIATE ATTENTION)\n"
+        for m, mo, y, c in zero_recall:
+            body += f"• {m} {mo} {y} — {c} complaints, ZERO recalls\n"
+        body += "\n"
+
+    if ratio_risk:
+        body += "🟠 EXTREME COMPLAINT-TO-RECALL IMBALANCE\n"
+        for m, mo, y, r in ratio_risk:
+            body += f"• {m} {mo} {y} — {r} complaints per recall\n"
+        body += "\n"
 
     body += (
         "🔗 Live Dashboard:\n"
@@ -103,8 +118,8 @@ def send_email(vehicles):
 
     msg = MIMEMultipart()
     msg["From"] = sender
-    msg["To"] = recipient
-    msg["Subject"] = "🚨 NHTSA Alert: Vehicles With Extreme Complaint-to-Recall Ratios"
+    msg["To"] = ", ".join(recipients)
+    msg["Subject"] = "🚨 NHTSA Safety Alert: Vehicles Requiring Immediate Review"
     msg.attach(MIMEText(body, "plain"))
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
@@ -116,19 +131,29 @@ def send_email(vehicles):
 
 
 def main():
-    vehicles = get_critical_vehicles()
-    if not vehicles:
-        print("[INFO] No critical vehicles")
+    zero_recall = get_zero_recall_vehicles()
+    ratio_risk = get_ratio_critical_vehicles()
+
+    if not zero_recall and not ratio_risk:
+        print("[INFO] No critical risks detected")
         return
 
-    current_hash = hash_payload(vehicles)
+    normalized_payload = []
+
+    for m, mo, y, c in zero_recall:
+        normalized_payload.append((m, mo, y, c, "ZERO_RECALL"))
+
+    for m, mo, y, r in ratio_risk:
+        normalized_payload.append((m, mo, y, r, "RATIO_RISK"))
+
+    current_hash = hash_payload(normalized_payload)
     last_hash = get_last_hash()
 
     if current_hash == last_hash:
-        print("[INFO] No change in critical vehicles. No alert sent.")
+        print("[INFO] No change in alert state")
         return
 
-    send_email(vehicles)
+    send_email(zero_recall, ratio_risk)
     update_hash(current_hash)
     print("[SUCCESS] Alert sent and state updated")
 

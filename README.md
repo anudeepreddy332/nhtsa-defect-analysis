@@ -232,8 +232,7 @@ Although total complaints dipped post-2020, **crash-related and fatal incidents 
 - **`vehicle_risk_scores`** - Risk categorization (CRITICAL/HIGH/MEDIUM/LOW)
 - **`component_analysis`** - Component failure Pareto (top 50)
 - **`yearly_trends`** - Time series (2020-2024)
-- **`top_recalled_vehicles`** - Vehicles with 2+ recalls
-
+- **`top_recalled_vehicles`** - Vehicles with 2+ recalls (surfaced in Silent Recalls dashboard for regulatory contrast)
 ---
 
 ## 🚀 Setup Instructions
